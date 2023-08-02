@@ -11,11 +11,6 @@ wtempdata$jday <- as.numeric(format(wtempdata$Datetime, format = "%j"))
 wtempdata$Year <- as.numeric(format(wtempdata$Datetime, format = "%Y"))
 wtempdata$Month <- as.numeric(format(wtempdata$Datetime, format = "%m"))
 
-##Analysis goals:
-## 1) Define recurrence interval of "fish killing" heat waves at LIS (longest record). Apply elsewhere.
-##    Plan to use flood typing methodology. First discretize heat events above some threshold. Bin by month?
-## 2) Use code for flow duration curve to apply to "heat duration curve". Apply to daily, min, max, and means.
-
 wtempply <- wtempdata[is.na(wtempdata$Param_val) == FALSE & wtempdata$Month %in% 6:10,] %>% 
   group_by(Year, jday, Month, Site_no) %>% 
   summarize(meantemp = mean(Param_val), mintemp = min(Param_val),
@@ -37,7 +32,10 @@ wtempply <- wtempply %>% group_by(Site_no) %>%
   mutate(maxP = 100 * (maxrank / (length(maxtemp) + 1)),
          minP = 100 * (minrank / (length(mintemp) + 1)))
 
-png("output/DS_HTI_heat_duraton_curve.png", height = 4, width = 6, unit = "in", res = 1000)
+# Plot heat duration curves for daily mins and maxes ----------------------
+
+png("output/DS_HTI_heat_duraton_curve_%02d.png", height = 4, width = 6, unit = "in", res = 1000)
+
 lisintmax <- max(c(0, unlist(wtempply[wtempply$Site_no == "LIS" & wtempply$maxtemp > 27, "maxP"])))
 rvbintmax <- max(c(0, unlist(wtempply[wtempply$Site_no == "RVB" & wtempply$maxtemp > 27, "maxP"])))
 
