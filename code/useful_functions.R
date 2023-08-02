@@ -19,10 +19,10 @@ downloadCDEC <- function(site_no, parameterCd, startDT, endDT){
   
   temp <- temp[,c(5,7)]
   colnames(temp) <- c("Datetime", "Param_val")
-  temp$site_no <- site_no
+  temp$Site_no <- site_no
   temp$parameterCd <- parameterCd
   temp$Datetime <- as.POSIXct(temp$Datetime, format = "%Y%m%d %H%M")
   
-  return(temp[,c("site_no", "Datetime", "parameterCd", "Param_val")])
+  return(temp[,c("Site_no", "Datetime", "parameterCd", "Param_val")])
 }
 
