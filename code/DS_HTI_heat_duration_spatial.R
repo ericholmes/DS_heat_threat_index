@@ -64,8 +64,6 @@ wtempply <- wtempply %>% group_by(StationCode) %>%
 
 # Plot heat duration curves for daily mins and maxes ----------------------
 
-
-
 xint <- data.frame()
 for(i in unique(wtempply$StationCode)){
   print(i)
@@ -75,6 +73,9 @@ for(i in unique(wtempply$StationCode)){
                                  "intmin" = max(c(0, unlist(wtempply[wtempply$StationCode == i & 
                                                                        wtempply$mintemp > 24, "minP"])))))
 }
+
+xint$Sitelabel <- c("CACHE", "RVB", "RYI", "SDI", "SRH", "LIS", "LIB", "STTD", 
+                     "DWSC", "LIBCUT")
 
 png("output/DS_HTI_heat_duration_curve_NDFSaxis_%02d.png", height = 4, width = 6, unit = "in", res = 1000)
 
@@ -94,12 +95,14 @@ ggplot(wtempply, aes(x = minP, y = mintemp, color = StationCode))+
   scale_color_viridis_d(option = "D") +
   geom_segment(data = xint, aes(x = intmin, xend = intmin, y = 0, yend = 24))
 
+cowplot::plot_grid(ggplot(xint, aes(x = reorder(Sitelabel, -intmax), y = intmax)) + geom_bar(stat = "identity") +
+                     theme_bw() + labs(x = NULL, y = "daily max > 27°C (%)"),
+                   
+                   ggplot(xint, aes(x = reorder(Sitelabel, -intmax), y = intmin)) + geom_bar(stat = "identity") +
+                     theme_bw() + labs(x = NULL, y = "daily min > 24°C (%)"),
+                   nrow = 2)
+
 dev.off()
-
-ggplot(xint, aes(x = StationCode, y = intmax)) + geom_bar(stat = "identity") + geom_point()
-
-ggplot(xint, aes(x = StationCode, y = intmin)) + geom_bar(stat = "identity") + geom_point()
-
 
 # Spatial -----------------------------------------------------------------
 
@@ -112,9 +115,7 @@ sites <- rbind(sites[,c(1:3)], data.frame("Sitename" = c("LIBCUT", "SDI", 114552
                           "Lon" = c(-121.6675, -121.736, -121.7092, -121.64388)))
 sites <- merge(sites, xint, by.x = "Sitename", by.y = "StationCode", all.y = T)
 sites <- sites[is.na(sites$Lat) == F, ]
-dput(sites$Sitename)
-sites$Sitelabel <- c("DWSC2", "CACHE", "LIB", "LIBCUT", "LIS", "RVB", "RYI", 
-                     "SDI", "STTD")
+
 
 pal <- colorNumeric(c("blue", "red", "black"), c(0,20),
                     na.color = "transparent")
