@@ -32,8 +32,10 @@ hydro.day.new = function(x, start.month = 10L){
 load("data/DS_HTI_Wtemp_data.Rdata")
 
 listemp <- wtempdata[wtempdata$Site_no == "LIS" & is.na(wtempdata$Param_val) == F,]
-
 listemp$Date <- as.Date(listemp$Datetime)
+listemp$Year <- format(listemp$Datetime, format = "%Y")
+listemp <- listemp[is.na(listemp$Datetime) == F,]
+listemp$jdayfrac <- sapply(listemp$Datetime, function(x) julian(x, origin = as.POSIXct(paste0(format(x, "%Y"),'-01-01'), tz = 'GMT')))
 
 # Data processing ---------------------------------------------------------
 
@@ -142,7 +144,7 @@ metrics <- c("duration", "centday", "maxtemp")
 ##Scale heat summary data
 lisscale <- (scale(lissum[lissum$duration > minduration, metrics]))
 
-set.seed(51684)                             
+set.seed(25842)                             
 ##K-means clustering analysis
 lismeans <- kmeans(lisscale, centers = 3)
 
@@ -425,10 +427,6 @@ summerflow <- data.frame(lis) %>% group_by(Year) %>%
 # meantemp$Typefac <- factor(meantemp$Type, levels = c("W", "AN", "BN",   "D",  "C"))
 # levels(meantemp$Typefac) <- c("Wet", "Above normal", "Below normal", "Dry", "Critical")
 
-listemp$Year <- format(listemp$Datetime, format = "%Y")
-listemp <- listemp[is.na(listemp$Datetime) == F,]
-listemp$jdayfrac <- sapply(listemp$Datetime, function(x) julian(x, origin = as.POSIXct(paste0(format(x, "%Y"),'-01-01'), tz = 'GMT')))
-
 png("output/DS_HTI_heat_wave_types_%02d.png", 
     family = "serif", width = 6.5, height= 7.5, units = "in", res = 1000, pointsize = 7.5)
 
@@ -448,7 +446,7 @@ ggplot(lis, aes(x = jday, y = meantemp)) + theme_bw() +
   geom_ribbon(data = lisclust[is.na(lisclust$Cluster) != T,], alpha = .5, 
               aes(ymin = 18, ymax = meantemp, group = heat_ID, fill = Key)) + scale_fill_brewer(palette = "Set1") +
   theme(legend.position = "bottom")  + labs(x = NULL) + ylim(18,30)+
-  geom_hline(yintercept = c(24,27), linetype = 2) +
+  geom_hline(yintercept = c(24,27), linetype = 2, color = "grey30") +
   scale_x_continuous(limits = c(150, 270),
                      breaks = c(0, 31, 59, 90, 120, 151, 181, 212, 242, 272, 303, 333, 364),
                      labels = c(month.abb, month.abb[1])) + facet_grid(Year ~ .)

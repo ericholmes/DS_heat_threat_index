@@ -6,7 +6,8 @@ downloadNWIS <- function(site_no, parameterCd, startDT, endDT){
                             "&startDT=", startDT,
                             "T00:00:00-07:00&endDT=", endDT,
                             "T00:00:00-07:00&siteStatus=all&format=rdb"),
-                     skip = 30, stringsAsFactors = F, col.names = c("Agency", "Site_no", "Date", "Time", "tz", "Param_val", "qc_code"))
+                     skip = 30, fill = TRUE, stringsAsFactors = F, 
+                     col.names = c("Agency", "Site_no", "Date", "Time", "tz", "Param_val", "qc_code"))
   temp$parameterCd <- parameterCd
   temp$Datetime <- as.POSIXct(paste(temp$Date, temp$Time), format = "%Y-%m-%d %H:%M")
   return(temp)
