@@ -29,10 +29,9 @@ hydro.day.new = function(x, start.month = 10L){
 
 # listemp <- read.csv("C:/Users/eholmes/Documents/R/Projects/Sentinel_CSC/data/B91560Q_Water_Temperature_ADCP_Raw.csv")
 
-load("data/DS_HTI_Wtemp_data.Rdata")
-unique(wtempdata$Site_no)
+load("data/DS_HTI_Wtemp_RVB+MAL.Rdata")
 
-listemp <- wtempdata[wtempdata$Site_no == "LIS" & is.na(wtempdata$Param_val) == F,]
+listemp <- wtempdata[wtempdata$Site_no == "MAL" & is.na(wtempdata$Param_val) == F & wtempdata$Param_val < 30,]
 listemp$Date <- as.Date(listemp$Datetime)
 listemp$Year <- format(listemp$Datetime, format = "%Y")
 listemp <- listemp[is.na(listemp$Datetime) == F,]
@@ -49,8 +48,8 @@ lisply <- listemp %>% group_by(Date) %>% summarize(mintemp = min(Param_val),
 
 lis <- lisply
 
-#Set heating threshold
-lis$heat <- ifelse(lis$mintemp > 24 | lis$maxtemp > 27, "over", "under")
+#Set heating threshold (Maybe set above 25)
+lis$heat <- ifelse(lis$mintemp > 21 | lis$maxtemp > 23, "over", "under")
 
 #Discretize contiguous heat events
 lis$runs <- rep(seq_along(rle(lis$heat)$lengths), rle(lis$heat)$lengths)
@@ -135,7 +134,7 @@ lissum$centvolloc <- (lissum$heatct - lissum$startday)/(lissum$endday - lissum$s
 
 row.names(lissum) <- lissum$heat_ID
 
-##Set minimum heat duraton threshold
+##Set minimum heat duration threshold
 minduration <- 2
 
 ##Set metrics to include in the scaling, K-means and PCA analyses
@@ -194,11 +193,11 @@ centroids <- lispcadf %>% group_by(Cluster) %>% summarise(PC1mean = mean(PC1), P
 centroids$PC1offset <- c(0.4, .5, .15)
 centroids$PC2offset <- c(0, .6, -.4)
 clustername <- data.frame(Cluster = 1:3, 
-                          label = c("Intense", "Longdur", "Late"),
+                          label = c("Intense", "Late-short", "Early-short"),
                           
-                          Key = c("Intense", "Longdur", "Late"))
+                          Key = c("Intense", "Late-short", "Early-short"))
 
-clustername$Key <- factor(clustername$Key, levels = c("Intense", "Longdur", "Late"))
+clustername$Key <- factor(clustername$Key, levels = c("Intense", "Late-short", "Early-short"))
 
 centroids <- merge(centroids, clustername, by = "Cluster", all.x = T)
 lispcadf <- merge(lispcadf, clustername, by = "Cluster", all.x = T)
@@ -250,7 +249,8 @@ kmeanspca
 ##Plot PCA with representative water years
 kmeanspca + geom_point(data = lispcadf[lispcadf$Year %in% c("2017"),], shape = "7", color = "black", size = 3) + 
   geom_point(data = lispcadf[lispcadf$Year %in% c("2019"),], shape = "9", color = "black", size = 3) +
-  geom_point(data = lispcadf[lispcadf$Year %in% c("2018"),], shape = "8", color = "black", size = 3) 
+  geom_point(data = lispcadf[lispcadf$Year %in% c("2018"),], shape = "8", color = "black", size = 3) +
+  geom_point(data = lispcadf[lispcadf$Year %in% c("2024"),], shape = "4", color = "red", size = 3) 
 
 ##Plot heat recurrence timing
 # recur_rate <- ggplot(lispcadfannual, aes(x = Year)) + geom_bar(aes(y = Recurrence), stat = "identity") + 
@@ -282,7 +282,7 @@ heat_timeline <- ggplot() +
   geom_line(data = lisclust[is.na(lisclust$Cluster) == F,], show.legend = F,
             aes(x = jday, y = Year, group = heat_ID, color = Key), linewidth = 5) +
   scale_color_brewer(palette = "Set1") + theme_bw() + labs(y = NULL, x = "Day of water year") +
-  scale_y_continuous(breaks = seq(2010, 2023, 1))
+  scale_y_continuous(breaks = seq(1980, 2024, 1), limits = c(1987,2024))
 
 heat_timeline 
 
@@ -293,8 +293,8 @@ df2 <- data.frame(x = gg1$data[[1]]$x,
                   ymin = gg1$data[[1]]$y,
                   ymax = gg1$data[[2]]$y) 
 
-if(saveplots == T){png("C:/Users/ejholmes/Box/Holmes/CV_heattyping/Output/Verona/Verona_heat_typing_cowplot%03d.png", 
-                       family = "serif", width = 6.5, height= 7.5, units = "in", res = 500, Param_valsize = 7.5)}
+if(saveplots == T){png("output/DS_HTI_heat_wave_timeline_MAL_%02d.png", 
+                       family = "serif", width = 6.5, height= 7.5, units = "in", res = 500)}
 
 
 left <- cowplot::plot_grid(kmeanspca, heattypes, labels = c("A", "B"),nrow = 2, greedy = T)
@@ -303,7 +303,7 @@ leftrecur <- cowplot::plot_grid(kmeanspca, recur_inthoriz, labels = c("A", "B"),
 
 cowplot::plot_grid(left, heat_timeline, labels = c("", "C"), ncol = 2)
 
-cowplot::plot_grid(leftrecur, heat_timeline_flipped, labels = c("", "C"), ncol = 2)
+# cowplot::plot_grid(leftrecur, heat_timeline_flipped, labels = c("", "C"), ncol = 2)
 
 dev.off()
 
@@ -330,9 +330,9 @@ legend("topleft", c("Linear trend", "Loess Line"),lty=c(1,2),col=c("black","red"
 if(saveplots == T){png("C:/Users/ejholmes/Box/Holmes/CV_heattyping/Output/Verona/Verona_heat_typing_CT_trends%03d.png", 
                        family = "serif", width = 6.5, height= 4.5, units = "in", res = 500, Param_valsize = 7.5)}
 
-(CTdam <- ggplot(CT, aes(y = x, x = yr)) + geom_point() +
+(CTdam <- ggplot(CT[CT$yr < 2024,], aes(y = x, x = yr)) + geom_point() +
     labs(y = "Water year center of mass", x = "year") +
-    stat_smooth(data = CT[CT$yr > 1968,], method = "lm", se = F) + theme_bw())
+    stat_smooth(data = CT[CT$yr < 2024,], method = "lm", se = F) + theme_bw())
 
 dev.off()
 
@@ -428,196 +428,49 @@ summerflow <- data.frame(lis) %>% group_by(Year) %>%
 # meantemp$Typefac <- factor(meantemp$Type, levels = c("W", "AN", "BN",   "D",  "C"))
 # levels(meantemp$Typefac) <- c("Wet", "Above normal", "Below normal", "Dry", "Critical")
 
-png("output/DS_HTI_heat_wave_types_%02d.png", 
+png("output/DS_HTI_heat_wave_types_MAL_%02d.png", 
     family = "serif", width = 6.5, height= 7.5, units = "in", res = 1000, pointsize = 7.5)
 
+listemp2 <- merge(listemp, lisclust[, c("Date", "Cluster", "Key", "heat_ID")], by = "Date", all.x = T)
 
 ggplot(lis[lis$Year == 2019,], aes(x = jday, y = meantemp)) + theme_bw() +
-  geom_line(data = listemp19, aes(x = jdayfrac, y = Param_val)) +
+  geom_line(data = listemp[listemp$Year == 2019,], aes(x = jdayfrac, y = Param_val)) +
   geom_ribbon(data = lisclust[lisclust$Year == 2019 & is.na(lisclust$Cluster) != T,], alpha = .5, 
               aes(ymin = 18, ymax = meantemp, group = heat_ID, fill = Key)) + scale_fill_brewer(palette = "Set1") +
-  theme(legend.position = "bottom")  + labs(x = NULL) + ylim(18,30)+
+  theme(legend.position = "bottom")  + labs(x = NULL) + ylim(18,26)+
   geom_hline(yintercept = c(24,27), linetype = 2) +
   scale_x_continuous(limits = c(150, 270),
                      breaks = c(0, 31, 59, 90, 120, 151, 181, 212, 242, 272, 303, 333, 364),
                      labels = c(month.abb, month.abb[1]))
 
+ggplot(lis[lis$Year == c(2019, 2021, 2023, 2024),], aes(x = jday, y = meantemp)) + theme_bw() +
+  geom_line(data = listemp[listemp$Year == c(2019, 2021, 2023, 2024),], aes(x = jdayfrac, y = Param_val)) +
+  geom_ribbon(data = listemp2[listemp2$Year == c(2019, 2021, 2023, 2024),], alpha = .5, 
+              aes(ymin = 18, ymax = meantemp, group = heat_ID, fill = Key)) + scale_fill_brewer(palette = "Set1") +
+  theme(legend.position = "bottom")  + labs(x = NULL) + ylim(18,26)+
+  geom_hline(yintercept = c(22,24), linetype = 2) +
+  scale_x_continuous(limits = c(150, 270),
+                     breaks = c(0, 31, 59, 90, 120, 151, 181, 212, 242, 272, 303, 333, 364),
+                     labels = c(month.abb, month.abb[1]))+ facet_grid(Year ~ .)
+
+ggplot(lis[lis$Year == c(2005:2024),], aes(x = jday, y = meantemp)) + theme_bw() +
+  geom_line(data = listemp[listemp$Year == c(2005:2024),], aes(x = jdayfrac, y = Param_val)) +
+  geom_ribbon(data = listemp2[listemp2$Year == c(2005:2024),], alpha = .5, 
+              aes(ymin = 18, ymax = meantemp, group = heat_ID, fill = Key)) + scale_fill_brewer(palette = "Set1") +
+  theme(legend.position = "bottom")  + labs(x = NULL) + ylim(18,26)+
+  geom_hline(yintercept = c(22,24), linetype = 2) +
+  scale_x_continuous(limits = c(150, 270),
+                     breaks = c(0, 31, 59, 90, 120, 151, 181, 212, 242, 272, 303, 333, 364),
+                     labels = c(month.abb, month.abb[1]))+ facet_grid(Year ~ .)
+
 ggplot(lis, aes(x = jday, y = meantemp)) + theme_bw() +
   geom_line(data = listemp, aes(x = jdayfrac, y = Param_val)) +
-  geom_ribbon(data = lisclust[is.na(lisclust$Cluster) != T,], alpha = .5, 
+  geom_ribbon(data = listemp2, alpha = .5, 
               aes(ymin = 18, ymax = meantemp, group = heat_ID, fill = Key)) + scale_fill_brewer(palette = "Set1") +
-  theme(legend.position = "bottom")  + labs(x = NULL) + ylim(18,30)+
+  theme(legend.position = "bottom")  + labs(x = NULL) + ylim(18,26)+
   geom_hline(yintercept = c(24,27), linetype = 2, color = "grey30") +
   scale_x_continuous(limits = c(150, 270),
                      breaks = c(0, 31, 59, 90, 120, 151, 181, 212, 242, 272, 303, 333, 364),
                      labels = c(month.abb, month.abb[1])) + facet_grid(Year ~ .)
 dev.off()
 
-##Flow duration curves pre and post shasta
-
-presub <- lis[lis$dam == "Pre",]
-presub$Flowrank <- rank(-presub$Flow)
-presub$prob <- 100 * (presub$Flowrank / (nrow(presub)+1))
-presub <- presub[order(presub$Flow),]
-
-preprobfun <- approxfun(presub$prob ~ presub$Flow, method = "linear")
-flowfun <- approxfun(presub$Flow ~ presub$prob, method = "linear")
-
-postsub <- lis[lis$dam == "Post",]
-postsub$Flowrank <- rank(-postsub$Flow)
-postsub$prob <- 100 * (postsub$Flowrank / (nrow(postsub)+1))
-postsub <- postsub[order(postsub$Flow),]
-
-postprobfun <- approxfun(postsub$prob ~ postsub$Flow, method = "linear")
-flowfun <- approxfun(postsub$Flow ~ postsub$prob, method = "linear")
-
-plot(Flow ~ prob, data = presub, type = "l", ylim = c(0, 50000), 
-     xlab = "Probability", ylab = "Flow (1000 cfs)")
-lines(Flow ~ prob, data = postsub, type = "l", col = "red")
-
-
-
-# Coleman SAR data --------------------------------------------------------
-
-sar <- read.csv("C:/Users/ejholmes/Box/PROJECTS/Sutter/DATA/CV_salmon_estimates/Coleman_SAR_FallRun.csv", stringsAsFactors = F)
-
-sarwy <- na.omit(merge(sar, Yearclass, by.x = "Brood_year", by.y = "Year", all.x = T))
-
-vare.mds <- metaMDS(sarwy[,c(2, 8:12)])
-
-pairs(sarwy[,c(2, 4,5,8:12)])
-
-plot(vare.mds, type = "t")
-
-data.scores <- as.data.frame(scores(vare.mds))  #Using the scores function from vegan to extract the site scores and convert to a data.frame
-data.scores$Year <- sarwy$Brood_year  # create a column of site names, from the rownames of data.scores
-
-species.scores <- as.data.frame(scores(vare.mds, "species"))  #Using the scores function from vegan to extract the species scores and convert to a data.frame
-species.scores$species <- rownames(species.scores)  # create a column of species, from the rownames of species.scores
-
-WYlong <- WYclass %>% pivot_longer(cols = c("Earlysmall", "Intermediate", "Latesmall", "Longduration", "Ravaging"), names_to = "Key")
-WYlong$decade <- cut(as.numeric(WYlong$WY), breaks = seq(1890,2020,10), labels = seq(1900,2020,10))
-
-ggplot() + geom_point(data = data.scores, aes(x = NMDS1, y = NMDS2), size = 3) + theme_bw() +
-  geom_text(data=species.scores,aes(x=NMDS1,y=NMDS2,label=species), vjust = -.5) +
-  geom_text_repel(data = data.scores, aes(x=NMDS1,y=NMDS2, label=WY), alpha=0.5, vjust = -.5) +
-  theme_bw() + theme(legend.position = "bottom")
-
-ggplot(WYlong, aes(x = as.numeric(WY), y = value, color = Key)) + 
-  stat_smooth(data = WYlong[as.numeric(WYlong$WY) < 8,],se = F) + 
-  stat_smooth(data = WYlong[as.numeric(WYlong$WY) >= 8,],se = F) + 
-  scale_color_brewer(palette = "Set1") + theme_bw() + geom_vline(xintercept = 8)
-
-ggplot(WYlong, aes(x = as.numeric(WY), y = value, fill = Key)) + 
-  geom_bar(stat = "identity") + facet_grid(Key ~ .) +
-  scale_fill_brewer(palette = "Set1") +
-  theme_bw() + geom_vline(xintercept = 8)
-
-WYlong
-
-WYlong$WYnum <- as.numeric(WYlong$WY)
-WYlong$Key <- factor(WYlong$Key, levels = c("Earlysmall", "Latesmall", "Goldilocks", "Longduration", "Ravaging"))
-
-htmlwidgets::saveWidget(streamgraph(data = WYlong, key = Key, value = value, date = WYnum, offset = "wiggle",
-                                    interpolate="basis", order = "reverse") %>%  sg_fill_brewer(palette = "Set1"), 
-                        # sg_fill_manual(viridis::viridis_pal()(5)),
-                        file = "C:/Users/ejholmes/Box/PROJECTS/Sutter/OUTPUT/streamgraphs/Streamgraph_wiggle.html", selfcontained = TRUE)
-
-htmlwidgets::saveWidget(streamgraph(data = WYlong, key = Key, value = value, date = WYnum, offset = "zero",
-                                    interpolate="basis", sort = F) %>% sg_fill_brewer(palette = "Set1"), 
-                        file = "C:/Users/ejholmes/Box/PROJECTS/Sutter/OUTPUT/streamgraphs/Streamgraph_zero.html", selfcontained = TRUE)
-
-htmlwidgets::saveWidget(streamgraph(data = WYlong, key = Key, value = value, date = WYnum, offset = "silhouette",
-                                    interpolate="basis", sort = F) %>% sg_fill_brewer(palette = "Set1"), 
-                        file = "C:/Users/ejholmes/Box/PROJECTS/Sutter/OUTPUT/streamgraphs/Streamgraph_silhouette.html", selfcontained = TRUE)
-
-# Winter-Run Grantab escapement -------------------------------------------
-
-wr <- read.csv("C:/Users/ejholmes/Box/Holmes/CV_heattyping/Data/Grandtab_WinterRun_RBDD.csv")
-
-wr$Brood_year <- wr$Year - 3
-wr$sp2esc <- wr$Annual/wr$Brood_year
-
-wrwy <- na.omit(merge(wr, WYclass, by.x = "Brood_year", by.y = "WY", all.x = T))
-
-vare.mds <- metaMDS(wrwy[,c(4:10)])
-
-pairs(wrwy[,c(4:10)])
-
-plot(vare.mds, type = "t")
-
-data.scores <- as.data.frame(scores(vare.mds))  #Using the scores function from vegan to extract the site scores and convert to a data.frame
-data.scores$WY <- wrwy$Brood_year  # create a column of site names, from the rownames of data.scores
-
-species.scores <- as.data.frame(scores(vare.mds, "species"))  #Using the scores function from vegan to extract the species scores and convert to a data.frame
-species.scores$species <- rownames(species.scores)  # create a column of species, from the rownames of species.scores
-
-WYlong <- WYclass %>% pivot_longer(cols = c("Earlysmall", "Intermediate", "Latesmall", "Longduration", "Ravaging"), names_to = "Key")
-WYlong$decade <- cut(as.numeric(WYlong$WY), breaks = seq(1890,2020,10), labels = seq(1900,2020,10))
-
-ggplot() + geom_point(data = data.scores, aes(x = NMDS1, y = NMDS2), size = 3) + theme_bw() +
-  geom_text(data=species.scores,aes(x=NMDS1,y=NMDS2,label=species), vjust = -.5) +
-  geom_text_repel(data = data.scores, aes(x=NMDS1,y=NMDS2, label=WY), alpha=0.5, vjust = -.5) +
-  theme_bw() + theme(legend.position = "bottom")
-
-ggplot(wrwy, aes(x = Brood_year, y = sp2esc, fill = events)) + geom_bar(stat = "identity") + theme_bw()
-ggplot(wrwy, aes(x = Brood_year, y = sp2esc, fill = Intermediate)) + geom_bar(stat = "identity") + theme_bw()
-ggplot(wrwy, aes(x = Brood_year, y = sp2esc, fill = Longduration)) + geom_bar(stat = "identity") + theme_bw()
-
-# Zero inflated poisson mixed model ---------------------------------------
-library(brms)
-library(StanHeaders)
-
-library(magrittr)
-library(dplyr)
-library(purrr)
-library(forcats)
-library(tidyr)
-library(modelr)
-library(ggdist)
-library(tidybayes)
-library(ggplot2)
-library(cowplot)
-library(rstan)
-library(brms)
-library(ggrepel)
-library(RColorBrewer)
-
-wrwy$sp2escint <- as.integer(wrwy$sp2esc)
-
-wreventlong <- merge(wr, WYlong[WYlong$Key != "Ravaging",], by.x = "Brood_year", by.y = "WY", all.x = T)
-
-fit_zinb1 <- brm(sp2escint ~ Earlysmall + Goldilocks + Latesmall + Longduration + events, 
-                 data = wrwy, family = zero_inflated_poisson())
-
-summary(fit_zinb1)
-plot(fit_zinb1)
-
-plot(conditional_effects(fit_zinb1))
-
-m = brm(
-  sp2esc ~ (1|Key),
-  data = wreventlong,
-  prior = c(prior(normal(0, 10), class = Intercept),
-            prior(beta(2, 2), class = zi)),
-  control = list(adapt_delta = .99))
-
-b11.4 <- 
-  brm(data = sp2esc, family = zero_inflated_poisson,
-      Y ~ 1,
-      prior = c(prior(normal(0, 10), class = Intercept),
-                prior(beta(2, 2), class = zi)),  # the brms default is beta(1, 1)
-      cores = 4,
-      seed = 11) 
-
-
-m %>%
-  spread_draws(b_Intercept, sigma) %>%
-  head(10)
-
-m %>%
-  spread_draws(b_Intercept, r_Key[Key,]) %>%
-  median_qi(Key_mean = b_Intercept + r_Key) %>%
-  ggplot(aes(y = Key, x = Key_mean, xmin = .lower, xmax = .upper)) +
-  geom_pointinterval()
-get_variables(m)
